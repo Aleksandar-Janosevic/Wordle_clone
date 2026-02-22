@@ -1,0 +1,86 @@
+id: REPLACE_WITH_YOUR_PROJECT_ID
+name: romcko
+type: laravel
+
+environments:
+  production:
+    build:
+      - 'composer install --no-dev --optimize-autoloader'
+      - 'php artisan config:cache'
+      - 'php artisan route:cache'
+      - 'php artisan view:cache'
+    
+    deploy:
+      - 'php artisan migrate --force'
+    
+    php:
+      version: '8.3'
+      memory: 512
+      max_execution_time: 30
+    
+    web:
+      document_root: /public
+      passthru: /index.php
+    
+    health_check:
+      path: /up
+      interval: 30
+    
+    workers:
+      - command: 'php artisan queue:work --sleep=3 --tries=3 --max-time=3600'
+        processes: 2
+    
+    schedule:
+      enabled: true
+    
+    database:
+      type: mysql
+      version: '8.0'
+    
+    cache:
+      type: redis
+    
+    storage:
+      type: s3
+    
+    environment:
+      APP_ENV: production
+      APP_DEBUG: false
+      LOG_CHANNEL: stack
+      LOG_LEVEL: error
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: database
+      CACHE_STORE: redis
+  
+  staging:
+    build:
+      - 'composer install --optimize-autoloader'
+      - 'php artisan config:cache'
+      - 'php artisan route:cache'
+      - 'php artisan view:cache'
+    
+    deploy:
+      - 'php artisan migrate --force'
+    
+    php:
+      version: '8.3'
+      memory: 256
+      max_execution_time: 30
+    
+    web:
+      document_root: /public
+      passthru: /index.php
+    
+    health_check:
+      path: /up
+      interval: 30
+    
+    database:
+      type: mysql
+      version: '8.0'
+    
+    environment:
+      APP_ENV: staging
+      APP_DEBUG: true
+      LOG_CHANNEL: stack
+      LOG_LEVEL: debug
