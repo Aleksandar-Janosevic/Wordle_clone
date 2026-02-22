@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Romcko - Погоди реч у 6 покушаја">
-    <title>Romcko</title>
+    <meta name="description" content="ромчко - Погоди реч у 6 покушаја">
+    <title>ромчко</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes flip {
@@ -40,7 +40,7 @@
     <div id="app" class="min-h-screen flex flex-col">
         <header class="border-b border-zinc-700 p-4 flex justify-between items-center">
             <button onclick="showHelp()" class="text-xl">❓</button>
-            <h1 class="text-3xl font-bold tracking-wider">ROMCKO</h1>
+            <h1 class="text-3xl font-bold tracking-wider">РОМЧКО</h1>
             <button onclick="showStats()" class="text-xl">📊</button>
         </header>
 
