@@ -382,7 +382,7 @@
         } else if (key === '⌫') {
             currentGuess = currentGuess.slice(0, -1);
             updateBoard();
-        } else if (currentGuess.length < WORD_LENGTH && /^[а-яљњћђџшчж]$/i.test(key)) {
+        } else if (currentGuess.length < WORD_LENGTH && /^[а-яјљњћђџшчж]$/i.test(key)) {
             currentGuess += key.toLowerCase();
             updateBoard();
             const tile = document.getElementById(`tile-${guesses.length}-${currentGuess.length - 1}`);
