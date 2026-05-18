@@ -352,30 +352,32 @@
                 return;
             }
 
-            if (currentGuess !== THE_WORD) {
-                const row = document.getElementById(`row-${guesses.length}`);
-                if (row) {
-                    row.classList.add('shake');
-                    setTimeout(() => row.classList.remove('shake'), 400);
-                }
-                showMessage('Није у речнику');
-                return;
-            }
-
             guesses.push(currentGuess);
             const row = guesses.length - 1;
+            const isWin = currentGuess === THE_WORD;
             currentGuess = '';
 
             revealRow(row, () => {
-                gameState = 'won';
-                stats.played++;
-                stats.won++;
-                stats.streak++;
-                stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
-                stats.dist[row]++;
-                saveGame();
-                bounceRow(row);
-                setTimeout(() => showStats(), 1200);
+                if (isWin) {
+                    gameState = 'won';
+                    stats.played++;
+                    stats.won++;
+                    stats.streak++;
+                    stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
+                    stats.dist[row]++;
+                    saveGame();
+                    bounceRow(row);
+                    setTimeout(() => showStats(), 1200);
+                } else if (guesses.length >= MAX_GUESSES) {
+                    gameState = 'lost';
+                    stats.played++;
+                    stats.streak = 0;
+                    saveGame();
+                    showMessage(THE_WORD.toUpperCase(), 2500);
+                    setTimeout(() => showStats(), 1500);
+                } else {
+                    saveGame();
+                }
             });
         } else if (key === '⌫') {
             currentGuess = currentGuess.slice(0, -1);
