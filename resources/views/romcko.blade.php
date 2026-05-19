@@ -141,7 +141,7 @@
 </div>
 
 <script>
-    const THE_WORD = 'бобан';
+    const THE_WORD = 'циган';
     const WORD_LENGTH = 5;
     const MAX_GUESSES = 6;
     const KEYBOARD_ROWS = [
