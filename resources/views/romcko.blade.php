@@ -108,11 +108,24 @@
         </div>
         <h3 class="text-xs font-bold mb-2 text-zinc-400">ДИСТРИБУЦИЈА</h3>
         <div id="distribution" class="space-y-1 mb-5"></div>
-        <div id="next-word" class="hidden text-center border-t border-zinc-700 pt-4">
+        <div id="share-section" class="hidden border-t border-zinc-700 pt-4">
+            <button onclick="shareResult()" class="w-full bg-green-600 active:bg-green-700 py-3 rounded-xl font-bold transition-colors mb-2">ПОДЕЛИ РЕЗУЛТАТ</button>
+            <div class="flex gap-2">
+                <button onclick="shareWhatsApp()" class="flex-1 py-3 rounded-xl font-bold transition-[filter] text-white" style="background-color:#25D366">WHATSAPP</button>
+                <button onclick="copyResult()" class="flex-1 bg-zinc-600 active:bg-zinc-700 py-3 rounded-xl font-bold transition-colors">КОПИРАЈ</button>
+            </div>
+        </div>
+
+        <div id="next-word" class="hidden text-center border-t border-zinc-700 pt-4 mt-4">
             <div class="text-xs text-zinc-400 mb-1">СЛЕДЕЋА РЕЧ</div>
             <div id="countdown" class="text-xl sm:text-2xl font-mono">00:00:00</div>
         </div>
-        <button onclick="hideStats()" class="mt-4 w-full bg-green-600 active:bg-green-700 py-3 rounded-xl font-bold transition-colors">ЗАТВОРИ</button>
+
+        <div id="play-again" class="hidden text-center border-t border-zinc-700 pt-4 mt-4">
+            <button onclick="playAgain()" class="w-full bg-green-600 active:bg-green-700 py-3 rounded-xl font-bold transition-colors">НОВА РЕЧ</button>
+        </div>
+
+        <button onclick="hideStats()" class="mt-4 w-full bg-zinc-700 active:bg-zinc-600 py-3 rounded-xl font-bold transition-colors">ЗАТВОРИ</button>
     </div>
 </div>
 
@@ -141,9 +154,46 @@
 </div>
 
 <script>
-    const THE_WORD = 'циган';
+    // Curated list of neutral 5-letter Serbian words (Cyrillic, lowercase).
+    // Have a native speaker review spelling/appropriateness before shipping.
+    const WORD_LIST = [
+        'књига','љубав','школа','земља','време','глава','сунце','месец','врата','камен',
+        'трава','цвеће','птица','мачка','крава','свиња','мајка','човек','посао','новац',
+        'храна','млеко','шећер','диван','срећа','живот','снага','слика','песма','лопта',
+        'прича','језик','облак','ватра','ветар','олуја','јесен','јутро','минут','башта',
+        'брава','сапун','капут','сукња','шешир','торба','табла','лампа','екран','дугме','пепео'
+    ];
+
+    // true  = one shared word per day for everyone, like NYT Wordle (recommended for sharing)
+    // false = a fresh random word every game, with a "play again" button
+    const DAILY_MODE = true;
+
+    // Day 0 of the daily puzzle counter. Puzzle number = days since this date.
+    const EPOCH = new Date(2024, 0, 1);
+
     const WORD_LENGTH = 5;
     const MAX_GUESSES = 6;
+
+    let THE_WORD = '';
+    let puzzleNumber = null;
+
+    function daysSinceEpoch() {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        return Math.floor((today - EPOCH) / 86400000);
+    }
+
+    function pickDailyWord() {
+        const n = daysSinceEpoch();
+        puzzleNumber = n;
+        const i = ((n % WORD_LIST.length) + WORD_LIST.length) % WORD_LIST.length;
+        THE_WORD = WORD_LIST[i];
+    }
+
+    function pickRandomWord() {
+        puzzleNumber = null;
+        THE_WORD = WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)];
+    }
     const KEYBOARD_ROWS = [
         ['љ', 'њ', 'е', 'р', 'т', 'з', 'у', 'и', 'о', 'п', 'ш'],
         ['а', 'с', 'д', 'ф', 'г', 'х', 'ј', 'к', 'л', 'ч', 'ћ'],
@@ -161,22 +211,27 @@
     }
 
     function loadGame() {
+        let restored = false;
         try {
             const saved = JSON.parse(localStorage.getItem('romcko-game') || '{}');
-            if (saved.dayKey === getDayKey()) {
+            if (saved.dayKey === getDayKey() && saved.word) {
                 guesses = saved.guesses || [];
                 gameState = saved.gameState || 'playing';
+                THE_WORD = saved.word;
+                restored = true;
             }
             stats = JSON.parse(localStorage.getItem('romcko-stats') || JSON.stringify(stats));
         } catch (e) {
             console.warn('Could not load game state');
         }
+        return restored;
     }
 
     function saveGame() {
         try {
             localStorage.setItem('romcko-game', JSON.stringify({
                 dayKey: getDayKey(),
+                word: THE_WORD,
                 guesses,
                 gameState
             }));
@@ -186,10 +241,23 @@
         }
     }
 
-    function getLetterState(letter, idx) {
-        if (THE_WORD[idx] === letter) return 'correct';
-        if (THE_WORD.includes(letter)) return 'present';
-        return 'absent';
+    // Proper Wordle scoring: a letter is only marked "present" if the answer
+    // still has an unmatched copy of it, so duplicates behave like real Wordle.
+    function evaluateGuess(guess) {
+        const result = new Array(WORD_LENGTH).fill('absent');
+        const answer = [...THE_WORD];
+        const g = [...guess];
+        const counts = {};
+        answer.forEach(c => counts[c] = (counts[c] || 0) + 1);
+
+        for (let i = 0; i < WORD_LENGTH; i++) {
+            if (g[i] === answer[i]) { result[i] = 'correct'; counts[g[i]]--; }
+        }
+        for (let i = 0; i < WORD_LENGTH; i++) {
+            if (result[i] === 'correct') continue;
+            if (counts[g[i]] > 0) { result[i] = 'present'; counts[g[i]]--; }
+        }
+        return result;
     }
 
     function createBoard() {
@@ -251,7 +319,7 @@
 
                 if (row < guesses.length) {
                     letter = guesses[row][col];
-                    const state = getLetterState(letter, col);
+                    const state = evaluateGuess(guesses[row])[col];
                     stateClass = state === 'correct' ? 'bg-green-600 border-green-600 text-white' :
                         state === 'present' ? 'bg-yellow-500 border-yellow-500 text-white' :
                             'bg-zinc-700 border-zinc-700 text-white';
@@ -269,9 +337,10 @@
     function updateKeyboard() {
         const keyStates = {};
         guesses.forEach(guess => {
+            const states = evaluateGuess(guess);
             for (let i = 0; i < guess.length; i++) {
                 const letter = guess[i];
-                const state = getLetterState(letter, i);
+                const state = states[i];
                 if (state === 'correct') keyStates[letter] = 'correct';
                 else if (state === 'present' && keyStates[letter] !== 'correct') keyStates[letter] = 'present';
                 else if (!keyStates[letter]) keyStates[letter] = 'absent';
@@ -304,13 +373,14 @@
 
     function revealRow(row, callback) {
         const guess = guesses[row];
+        const states = evaluateGuess(guess);
         let i = 0;
         const interval = setInterval(() => {
             const tile = document.getElementById(`tile-${row}-${i}`);
             if (!tile) return;
 
             tile.classList.add('animate-flip');
-            const state = getLetterState(guess[i], i);
+            const state = states[i];
             setTimeout(() => {
                 tile.className = `tile border-2 rounded-md flex items-center justify-center font-bold uppercase ${
                     state === 'correct' ? 'bg-green-600 border-green-600' :
@@ -411,7 +481,11 @@
                 `;
         });
 
-        if (gameState !== 'playing') {
+        const over = gameState !== 'playing';
+        document.getElementById('share-section').classList.toggle('hidden', !over);
+        document.getElementById('play-again').classList.toggle('hidden', !(over && !DAILY_MODE));
+
+        if (over && DAILY_MODE) {
             document.getElementById('next-word').classList.remove('hidden');
             updateCountdown();
         } else {
@@ -436,6 +510,53 @@
         document.getElementById('countdown').textContent = `${h}:${m}:${s}`;
     }
 
+    function buildShareText() {
+        const tries = gameState === 'won' ? guesses.length : 'X';
+        const title = DAILY_MODE
+            ? `Ромчко ${puzzleNumber} ${tries}/${MAX_GUESSES}`
+            : `Ромчко ${tries}/${MAX_GUESSES}`;
+        const grid = guesses.map(g =>
+            evaluateGuess(g).map(s =>
+                s === 'correct' ? '🟩' : s === 'present' ? '🟨' : '⬛'
+            ).join('')
+        ).join('\n');
+        return `${title}\n\n${grid}`;
+    }
+
+    async function shareResult() {
+        const text = buildShareText();
+        if (navigator.share) {
+            try { await navigator.share({ text }); return; }
+            catch (e) { if (e.name === 'AbortError') return; }
+        }
+        copyResult();
+    }
+
+    function shareWhatsApp() {
+        window.open('https://wa.me/?text=' + encodeURIComponent(buildShareText()), '_blank');
+    }
+
+    async function copyResult() {
+        try {
+            await navigator.clipboard.writeText(buildShareText());
+            showMessage('Копирано!');
+        } catch (e) {
+            showMessage('Копирање није успело');
+        }
+    }
+
+    function playAgain() {
+        guesses = [];
+        currentGuess = '';
+        gameState = 'playing';
+        pickRandomWord();
+        saveGame();
+        createBoard();
+        updateBoard();
+        updateKeyboard();
+        hideStats();
+    }
+
     // Keyboard input for desktop
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') handleKey('enter');
@@ -448,7 +569,9 @@
 
     // Initialize
     setInterval(updateCountdown, 1000);
-    loadGame();
+    loadGame();                             // may restore today's guesses/state/word
+    if (DAILY_MODE) pickDailyWord();        // daily: always use today's shared word (also sets puzzle number)
+    else if (!THE_WORD) pickRandomWord();   // random: only pick fresh if nothing was restored
     createBoard();
     createKeyboard();
     updateBoard();
